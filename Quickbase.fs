@@ -43,6 +43,12 @@ type Quickbase() =
                    |> Seq.map (fun x -> x |> elementValue "label")
         }
 
+    member this.GetData tableId = 
+        async { 
+            let! xml = qbCall "API_DoQuery" "<fmt>structured</fmt>" tableId
+            return xml
+        }
+
 //let b = new Quickbase()
 //let t = b.Authenticate "sergey_aldoukhov@intuit.com" "" |> Async.RunSynchronously
 //let s = b.GetSchema "bgpvar6v2" |> Async.RunSynchronously

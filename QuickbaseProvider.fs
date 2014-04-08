@@ -3,9 +3,12 @@
 open ProviderImplementation.ProvidedTypes
 open Microsoft.FSharp.Core.CompilerServices
 
-type QuickbaseTableData(tableId) = 
-    let data = [ "a"; "b"; "c" ] |> Seq.toList
+type QuickbaseRecord = { RecordNumber : int }
+
+type QuickbaseTableData(tableId, user, password) = 
+    let data = [ { RecordNumber = 1 }; { RecordNumber = 2 }; { RecordNumber = 3 } ] |> Seq.toList
     member __.Records = data
+
 
 [<TypeProvider>]
 type public QuickbaseProvider(cfg : TypeProviderConfig) as this = 
@@ -15,17 +18,19 @@ type public QuickbaseProvider(cfg : TypeProviderConfig) as this =
     let quickbaseType = ProvidedTypeDefinition(asm, ns, "QuickbaseTable", Some(typeof<obj>))
     
     let buildTypes (typeName : string) (args : obj []) = 
-        let tableIdParameter = "12345"
+        let tableIdParameter = args.[0] :?> string
+        let userParameter = args.[1] :?> string
+        let passwordParameter = args.[2] :?> string
 
         let provider = ProvidedTypeDefinition(asm, ns, typeName, Some typeof<QuickbaseTableData>)
 
-        let recordType = ProvidedTypeDefinition("Record", Some typeof<string>)
+        let recordType = ProvidedTypeDefinition("Record", Some typeof<QuickbaseRecord>, HideObjectMethods = true)
 
-        let recNumProp = ProvidedProperty("RecordNumber", typeof<string>, GetterCode = fun [ record ] -> <@@ (%%record:string) @@>)
+        let recNumProp = ProvidedProperty("RecordNumber", typeof<int>, GetterCode = fun [ record ] -> <@@ (%%record:QuickbaseRecord).RecordNumber @@>)
 
         recordType.AddMember(recNumProp)
 
-        let ctor1 = ProvidedConstructor([], InvokeCode = fun [] -> <@@ QuickbaseTableData(tableIdParameter) @@>)
+        let ctor1 = ProvidedConstructor([], InvokeCode = fun [] -> <@@ QuickbaseTableData(tableIdParameter, userParameter, passwordParameter) @@>)
 //        let ctor2 = ProvidedConstructor([ProvidedParameter("TableId", typeof<string>)], InvokeCode = fun [tableId] -> <@@ QuickbaseTableData(%%tableId) @@>)
 
         let recordsProperty = 
@@ -40,7 +45,11 @@ type public QuickbaseProvider(cfg : TypeProviderConfig) as this =
 
         provider
     
-    let parameters = [ ProvidedStaticParameter("TableId", typeof<string>) ]
+    let parameters = [ 
+        ProvidedStaticParameter("TableId", typeof<string>);
+        ProvidedStaticParameter("User", typeof<string>);
+        ProvidedStaticParameter("Password", typeof<string>) 
+        ]
     do quickbaseType.DefineStaticParameters(parameters, buildTypes)
     do this.AddNamespace(ns, [quickbaseType])
 
