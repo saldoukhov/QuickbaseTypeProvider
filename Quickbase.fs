@@ -40,16 +40,12 @@ type Quickbase() =
             let! xml = qbCall "API_GetSchema" "" tableId
             return xml
                    |> descendants "field"
-                   |> Seq.map (fun x -> x |> elementValue "label")
+                   |> mapToElement "label"
         }
 
     member this.GetData tableId = 
         async { 
-            let! xml = qbCall "API_DoQuery" "<fmt>structured</fmt>" tableId
-            return xml
+//            let! xml = qbCall "API_DoQuery" "<fmt>structured</fmt>" tableId
+            let! xml = qbCall "API_DoQuery" "" tableId
+            return xml |> descendants "record"
         }
-
-//let b = new Quickbase()
-//let t = b.Authenticate "sergey_aldoukhov@intuit.com" "" |> Async.RunSynchronously
-//let s = b.GetSchema "bgpvar6v2" |> Async.RunSynchronously
-//printf "%A" (s |> Seq.toList)

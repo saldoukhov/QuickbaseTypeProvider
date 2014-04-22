@@ -2,13 +2,20 @@
 
 open ProviderImplementation.ProvidedTypes
 open Microsoft.FSharp.Core.CompilerServices
+open System.Xml.Linq
+open Quickbase
+open Xml
 
-type QuickbaseRecord = { RecordNumber : int }
+type QuickbaseRecord = 
+    { Xml : XElement }
+    with member this.RecVal (name: string) = this.Xml |> elementValue (name.ToLower()) 
 
 type QuickbaseTableData(tableId, user, password) = 
-    let data = [ { RecordNumber = 1 }; { RecordNumber = 2 }; { RecordNumber = 3 } ] |> Seq.toList
+    let quickbase = new Quickbase()
+    let ticket = quickbase.Authenticate user password |> Async.RunSynchronously
+    let xml = quickbase.GetData tableId |> Async.RunSynchronously
+    let data = xml |> Seq.map (fun x -> { Xml = x })
     member __.Records = data
-
 
 [<TypeProvider>]
 type public QuickbaseProvider(cfg : TypeProviderConfig) as this = 
@@ -26,9 +33,14 @@ type public QuickbaseProvider(cfg : TypeProviderConfig) as this =
 
         let recordType = ProvidedTypeDefinition("Record", Some typeof<QuickbaseRecord>, HideObjectMethods = true)
 
-        let recNumProp = ProvidedProperty("RecordNumber", typeof<int>, GetterCode = fun [ record ] -> <@@ (%%record:QuickbaseRecord).RecordNumber @@>)
-
-        recordType.AddMember(recNumProp)
+        let quickbase = new Quickbase()
+        let ticket = quickbase.Authenticate userParameter passwordParameter |> Async.RunSynchronously
+        let xml = quickbase.GetSchema tableIdParameter |> Async.RunSynchronously
+        xml |> Seq.iter (fun x -> 
+            let propName = x.Replace(' ', '_')
+            let recNumProp = ProvidedProperty(propName, typeof<string>, GetterCode = fun [ record ] -> <@@ (%%record:QuickbaseRecord).RecVal propName @@>)
+            recordType.AddMember(recNumProp)
+        )
 
         let ctor1 = ProvidedConstructor([], InvokeCode = fun [] -> <@@ QuickbaseTableData(tableIdParameter, userParameter, passwordParameter) @@>)
 //        let ctor2 = ProvidedConstructor([ProvidedParameter("TableId", typeof<string>)], InvokeCode = fun [tableId] -> <@@ QuickbaseTableData(%%tableId) @@>)
