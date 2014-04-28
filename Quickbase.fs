@@ -5,6 +5,14 @@ open System.Net.Http.Headers
 open Http
 open Xml
 
+type QuickBaseFieldType = 
+    | Text
+    | Float
+
+type QuickBaseField = 
+    { Label : string
+      Type : QuickBaseFieldType }
+
 type Quickbase() = 
     let client = new HttpClient()
     let mutable ticket = null
@@ -38,14 +46,18 @@ type Quickbase() =
     member this.GetSchema tableId = 
         async { 
             let! xml = qbCall "API_GetSchema" "" tableId
+            let label el = el |> mapToElement "label"
             return xml
                    |> descendants "field"
-                   |> mapToElement "label"
+                   |> Seq.map (fun x -> 
+                          { Label = x |> elementValue "label"
+                            Type = 
+                                match x |> attributeValue "field_type" with
+                                | "float" -> Float
+                                | _ -> Text })
         }
-
-    member this.GetData tableId = 
-        async { 
-//            let! xml = qbCall "API_DoQuery" "<fmt>structured</fmt>" tableId
-            let! xml = qbCall "API_DoQuery" "" tableId
-            return xml |> descendants "record"
-        }
+    
+    member this.GetData tableId = async { 
+                                      //            let! xml = qbCall "API_DoQuery" "<fmt>structured</fmt>" tableId
+                                      let! xml = qbCall "API_DoQuery" "" tableId
+                                      return xml |> descendants "record" }

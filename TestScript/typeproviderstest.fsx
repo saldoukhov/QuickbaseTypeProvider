@@ -6,4 +6,4 @@ let qb = new QuickbaseTable<TableId="bgpvar6v2", User=Settings.Credentials.user,
 
 let frstrow = qb.Records |> Seq.head
 
-let v = frstrow.RecordNumber
+let v = frstrow.Label

@@ -8,7 +8,8 @@ open Xml
 
 type QuickbaseRecord = 
     { Xml : XElement }
-    with member this.RecVal (name: string) = this.Xml |> elementValue (name.ToLower()) 
+    with member this.StringVal (name: string) = this.Xml |> elementValue (name.ToLower()) 
+         member this.FloatVal (name: string) = this.Xml |> elementValue (name.ToLower()) |> System.Double.Parse
 
 type QuickbaseTableData(tableId, user, password) = 
     let quickbase = new Quickbase()
@@ -35,10 +36,17 @@ type public QuickbaseProvider(cfg : TypeProviderConfig) as this =
 
         let quickbase = new Quickbase()
         let ticket = quickbase.Authenticate userParameter passwordParameter |> Async.RunSynchronously
-        let xml = quickbase.GetSchema tableIdParameter |> Async.RunSynchronously
-        xml |> Seq.iter (fun x -> 
-            let propName = x.Replace(' ', '_')
-            let recNumProp = ProvidedProperty(propName, typeof<string>, GetterCode = fun [ record ] -> <@@ (%%record:QuickbaseRecord).RecVal propName @@>)
+        let schema = quickbase.GetSchema tableIdParameter |> Async.RunSynchronously
+        schema |> Seq.iter (fun x -> 
+            let propName = x.Label.Replace(' ', '_')
+            let recNumProp = ProvidedProperty(propName, 
+                                match x.Type with
+                                | Text -> typeof<string>
+                                | Float -> typeof<float>
+                                , 
+                                GetterCode = match x.Type with
+                                                | Text -> fun [ record ] -> <@@ (%%record:QuickbaseRecord).StringVal propName @@>
+                                                | Float -> fun [ record ] -> <@@ (%%record:QuickbaseRecord).FloatVal propName @@>)
             recordType.AddMember(recNumProp)
         )
 
